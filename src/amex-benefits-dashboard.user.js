@@ -1597,6 +1597,19 @@
     // Main card area (click to expand)
     const main = document.createElement('div');
     main.className = 'amex-dash-benefit-main';
+    
+    let ytdHtml = '';
+    if (benefit.durationLabel !== 'Annual' && benefit.annualTarget > 0) {
+      const ytdPct = Math.min((benefit.annualYtd / benefit.annualTarget) * 100, 100);
+      const ytdColorClass = getColorClass(ytdPct);
+      ytdHtml = `
+        <div class="amex-dash-progress-bar" style="margin-top: 8px;">
+          <div class="amex-dash-progress-fill fill-${ytdColorClass}" style="width: ${ytdPct.toFixed(1)}%"></div>
+        </div>
+        <div class="amex-dash-progress-text">${ytdPct.toFixed(0)}% YTD (${formatCurrency(benefit.annualYtd, symbol)}/${formatCurrency(benefit.annualTarget, symbol)})</div>
+      `;
+    }
+
     main.innerHTML = `
       <div class="amex-dash-benefit-top">
         <div class="amex-dash-benefit-name">${escapeHtml(benefit.benefitName)}</div>
@@ -1611,6 +1624,7 @@
         <div class="amex-dash-progress-fill fill-${colorClass}" style="width: ${pct.toFixed(1)}%"></div>
       </div>
       <div class="amex-dash-progress-text">${pct.toFixed(0)}% ${escapeHtml(periodWord)}</div>
+      ${ytdHtml}
     `;
 
     main.addEventListener('click', () => {
