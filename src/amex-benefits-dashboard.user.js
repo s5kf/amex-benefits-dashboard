@@ -1628,12 +1628,29 @@
     let ytdHtml = '';
     if (benefit.durationLabel !== 'Annual' && benefit.annualTarget > 0) {
       const ytdPct = Math.min((benefit.annualYtd / benefit.annualTarget) * 100, 100);
-      const ytdColorClass = getColorClass(ytdPct);
       
       const totalCredits = benefit.periodMultiplier * benefit.cards.length;
       const creditValue = benefit.annualTarget / totalCredits;
       const creditsUsed = creditValue > 0 ? (benefit.annualYtd / creditValue) : 0;
       const formattedCreditsUsed = creditsUsed % 1 === 0 ? creditsUsed : creditsUsed.toFixed(1);
+      
+      // Calculate max possible YTD based on current date
+      const now = new Date();
+      const month = now.getMonth();
+      let periodsPassed = 0;
+      if (benefit.durationLabel === 'Monthly') periodsPassed = month + 1;
+      else if (benefit.durationLabel === 'Quarterly') periodsPassed = Math.floor(month / 3) + 1;
+      else if (benefit.durationLabel === 'Semi-Annual') periodsPassed = Math.floor(month / 6) + 1;
+      else periodsPassed = 1;
+      
+      const maxPossibleYtd = periodsPassed * creditValue * benefit.cards.length;
+      
+      let ytdColorClass = 'unused';
+      if (benefit.annualYtd >= maxPossibleYtd - 0.01 || ytdPct >= 99.5) {
+        ytdColorClass = 'full'; // Green if on track for the year so far, or fully maxed
+      } else if (benefit.annualYtd > 0) {
+        ytdColorClass = 'partial';
+      }
       
       let ticksHtml = '';
       if (totalCredits <= 48) {
