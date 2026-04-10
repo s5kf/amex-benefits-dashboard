@@ -661,6 +661,31 @@
     return total;
   }
 
+  const STORAGE_KEY_MANUAL_YTD = 'amexDash_manual_ytd';
+
+  function getManualYtds() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_MANUAL_YTD) || '{}');
+    } catch(e) { return {}; }
+  }
+
+  function getManualYtd(benefitId, accountToken) {
+    const dict = getManualYtds();
+    const val = dict[benefitId + '|' + accountToken];
+    return typeof val === 'number' ? val : null;
+  }
+
+  function setManualYtd(benefitId, accountToken, amount) {
+    const dict = getManualYtds();
+    const key = benefitId + '|' + accountToken;
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      delete dict[key];
+    } else {
+      dict[key] = amount;
+    }
+    try { localStorage.setItem(STORAGE_KEY_MANUAL_YTD, JSON.stringify(dict)); } catch(e) {}
+  }
+
   /**
    * Aggregate tracker results across all cards.
    * Groups by benefitId, filters to category==="usage".
@@ -741,16 +766,17 @@
         const periodKey = (t.periodStartDate || '') + '_' + (t.periodEndDate || '');
         selfTrackPeriod(t.benefitId, result.accountToken, periodKey, spent);
 
-        // Fallback chain: API totalSavingsYearToDate > self-tracked > current period
+        // Fallback chain: Manual Override > API totalSavingsYearToDate > self-tracked > current period
+        const manualYtd = getManualYtd(t.benefitId, result.accountToken);
         const selfTrackedYtd = getSelfTrackedYtd(t.benefitId, result.accountToken);
-        const effectiveYtd = ytd !== null ? ytd : (selfTrackedYtd !== null ? selfTrackedYtd : spent);
+        const effectiveYtd = manualYtd !== null ? manualYtd : (ytd !== null ? ytd : (selfTrackedYtd !== null ? selfTrackedYtd : spent));
 
         group.totalTarget += target;
         group.totalSpent += spent;
         group.totalRemaining += remaining;
         group.annualTarget += target * period.multiplier;
         group.annualYtd += effectiveYtd;
-        if (ytd === null && selfTrackedYtd === null) group.hasIncompleteYtd = true;
+        if (ytd === null && selfTrackedYtd === null && manualYtd === null) group.hasIncompleteYtd = true;
 
         group.cards.push({
           accountToken: result.accountToken,
@@ -764,6 +790,7 @@
           annualTarget: target * period.multiplier,
           ytd: effectiveYtd,
           progressTitle: t.progress?.title || t.benefitName,
+          benefitId: t.benefitId,
         });
       }
     }
@@ -1602,11 +1629,25 @@
     if (benefit.durationLabel !== 'Annual' && benefit.annualTarget > 0) {
       const ytdPct = Math.min((benefit.annualYtd / benefit.annualTarget) * 100, 100);
       const ytdColorClass = getColorClass(ytdPct);
+      
+      const totalCredits = benefit.periodMultiplier * benefit.cards.length;
+      const creditValue = benefit.annualTarget / totalCredits;
+      const creditsUsed = creditValue > 0 ? (benefit.annualYtd / creditValue) : 0;
+      const formattedCreditsUsed = creditsUsed % 1 === 0 ? creditsUsed : creditsUsed.toFixed(1);
+      
+      let ticksHtml = '';
+      if (totalCredits <= 48) {
+        for (let i = 1; i < totalCredits; i++) {
+          ticksHtml += `<div style="position: absolute; top: 0; bottom: 0; left: ${(i / totalCredits) * 100}%; width: 1px; background: rgba(0,0,0,0.12); z-index: 1;"></div>`;
+        }
+      }
+
       ytdHtml = `
-        <div class="amex-dash-progress-bar" style="margin-top: 8px;">
-          <div class="amex-dash-progress-fill fill-${ytdColorClass}" style="width: ${ytdPct.toFixed(1)}%"></div>
+        <div class="amex-dash-progress-bar" style="margin-top: 8px; position: relative;">
+          <div class="amex-dash-progress-fill fill-${ytdColorClass}" style="width: ${ytdPct.toFixed(1)}%; position: relative; z-index: 0;"></div>
+          ${ticksHtml}
         </div>
-        <div class="amex-dash-progress-text">${ytdPct.toFixed(0)}% YTD (${formatCurrency(benefit.annualYtd, symbol)}/${formatCurrency(benefit.annualTarget, symbol)})</div>
+        <div class="amex-dash-progress-text">${ytdPct.toFixed(0)}% YTD (${formatCurrency(benefit.annualYtd, symbol)}/${formatCurrency(benefit.annualTarget, symbol)} &middot; ${formattedCreditsUsed} of ${totalCredits} used)</div>
       `;
     }
 
@@ -1642,6 +1683,11 @@
         : 0;
       const cardColor = getColorClass(cardPct);
 
+      let cardYtdHtml = '';
+      if (benefit.durationLabel !== 'Annual' && card.annualTarget > 0) {
+        cardYtdHtml = `<span style="margin-left:8px; color:#888;">YTD: <span class="amex-dash-edit-ytd" data-benefit="${escapeHtml(card.benefitId)}" data-token="${escapeHtml(card.accountToken)}" style="cursor:pointer; border-bottom:1px dashed #aaa;" title="Click to manually set YTD">${formatCurrency(card.ytd, symbol)}</span></span>`;
+      }
+
       const cardRow = document.createElement('div');
       cardRow.className = 'amex-dash-card-row';
       cardRow.style.cssText = 'display:block;padding:8px 16px;border-bottom:1px solid #f5f5f5;font-size:12px;';
@@ -1655,8 +1701,27 @@
         </div>
         <div style="font-size:11px;color:#888;text-align:right;">
           <span class="color-${cardColor}" style="font-weight:600;">${formatCurrency(card.spent, symbol)}</span> / ${formatCurrency(card.target, symbol)} ${escapeHtml(periodWord)}
+          ${cardYtdHtml}
         </div>
       `;
+
+      const editBtn = cardRow.querySelector('.amex-dash-edit-ytd');
+      if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newVal = prompt('Enter manual YTD spent for this card (or leave blank to clear):', card.ytd);
+          if (newVal !== null) {
+            if (newVal.trim() === '') {
+              setManualYtd(card.benefitId, card.accountToken, null);
+            } else {
+              const parsed = parseFloat(newVal.replace(/[^0-9.]/g, ''));
+              if (!isNaN(parsed)) setManualYtd(card.benefitId, card.accountToken, parsed);
+            }
+            showDashboard(true);
+          }
+        });
+      }
+
       details.appendChild(cardRow);
     }
 
