@@ -1025,24 +1025,15 @@
       /* ── Benefit card ── */
       .amex-dash-benefit-row {
         background: #fff;
-        border-radius: 8px;
+        border-radius: 6px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         overflow: hidden;
-        border: 1px solid #eee;
-        transition: box-shadow 0.2s;
-        border-left: 4px solid #ef5350;
+        border: 1px solid #e0e0e0;
+        transition: box-shadow 0.2s, border-color 0.2s;
       }
       .amex-dash-benefit-row:hover {
         box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-      }
-      .amex-dash-benefit-row.color-border-partial {
-        border-left-color: #ffa726;
-      }
-      .amex-dash-benefit-row.color-border-full {
-        border-left-color: #66bb6a;
-      }
-      .amex-dash-benefit-row.color-border-unused {
-        border-left-color: #ef5350;
+        border-color: #ccc;
       }
 
       .amex-dash-benefit-main {
@@ -1270,7 +1261,8 @@
 
   function formatCurrency(amount, symbol = '$') {
     const safe = escapeHtml(symbol);
-    return `${safe}${amount.toFixed(2)}`;
+    const formattedAmount = amount % 1 === 0 ? amount : amount.toFixed(2);
+    return `${safe}${formattedAmount}`;
   }
 
   function renderDashboard(container, summary, cardCount) {
@@ -1600,7 +1592,7 @@
       : 'this year';
 
     const row = document.createElement('div');
-    row.className = `amex-dash-benefit-row color-border-${colorClass}`;
+    row.className = `amex-dash-benefit-row`;
 
     // Main card area (click to expand)
     const main = document.createElement('div');
