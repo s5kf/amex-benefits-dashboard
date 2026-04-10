@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Amex Benefits Dashboard
 // @namespace    https://github.com/amex-benefits-dashboard
-// @version      1.0.0
-// @author       jackie099
+// @version      1.1.0
+// @author       jackie099 (forked by s5kf)
 // @description  Unified benefits credit tracker across all Amex cards
 // @match        https://global.americanexpress.com/*
 // @match        https://www.americanexpress.com/*
@@ -213,7 +213,7 @@
   let originalContent = null;
   let dashboardGeneration = 0;
 
-  console.log('[AmexDash] v1.0.0 loaded | readyState=' + document.readyState + ' | fetch=' + (typeof originalFetch) + ' | body=' + !!document.body);
+  console.log('[AmexDash] v1.1.0 loaded | readyState=' + document.readyState + ' | fetch=' + (typeof originalFetch) + ' | body=' + !!document.body);
 
   // ============================================================
   // Module 1: API Client
